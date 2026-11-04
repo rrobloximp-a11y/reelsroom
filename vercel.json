@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/media/(.*)", "destination": "/media" },
+    { "source": "/channel-media/(.*)", "destination": "/channel-media" },
+    { "source": "/post-media/(.*)", "destination": "/post-media" }
+  ]
+}
