@@ -1,16 +1,15 @@
-import { getStore } from "@netlify/blobs";
-import { getUser } from "@netlify/identity";
 import { eq } from "drizzle-orm";
-import { db } from "../../db/index.js";
-import { channels } from "../../db/schema.js";
+import { db } from "../db/index.js";
+import { channels } from "../db/schema.js";
+import { admin } from "./supabase.js";
+import { requestInfo, type CurrentUser } from "./request.js";
+import { mediaStore } from "./storage.js";
 
 // 3 MiB keeps every chunk upload and every ranged response well under the 6 MB function payload limit.
 export const CHUNK_SIZE = 3 * 1024 * 1024;
 export const MAX_VIDEO_BYTES = 500 * 1024 * 1024;
 export const MAX_THUMB_BYTES = 2 * 1024 * 1024;
 export const ALLOWED_MIME = ["video/mp4", "video/webm", "video/quicktime", "video/ogg"];
-
-export const mediaStore = () => getStore("media");
 
 export const chunkKey = (videoId: string, n: number) => `videos/${videoId}/chunks/${String(n).padStart(5, "0")}`;
 export const chunkPrefix = (videoId: string) => `videos/${videoId}/chunks/`;
@@ -24,9 +23,18 @@ export class HttpError extends Error {
 
 export const json = (data: unknown, status = 200) => Response.json(data, { status });
 
-export async function currentUser() {
-  const user = await getUser();
-  return user ?? null;
+export async function currentUser(): Promise<CurrentUser> {
+  const info = requestInfo();
+  if (!info.token) return null;
+  info.user ??= lookupUser(info.token);
+  return info.user;
+}
+
+async function lookupUser(token: string): Promise<CurrentUser> {
+  const { data, error } = await admin.auth.getUser(token);
+  if (error || !data.user) return null;
+  const name = data.user.user_metadata?.full_name;
+  return { id: data.user.id, email: data.user.email ?? "", name: typeof name === "string" ? name : undefined };
 }
 
 export async function requireUser() {
